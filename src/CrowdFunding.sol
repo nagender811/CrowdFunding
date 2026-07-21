@@ -4,12 +4,21 @@ pragma solidity ^0.8.13;
 contract CrowdFunding {
     error InvalidGaol();
     error InvalidDuration();
+    error CampaignNotActive();
+    error CampaignEnded();
+    error InvalidContribution();
 
     event CampaignCreated(
         uint256 indexed campaignId,
         address indexed creater,
         uint256 goal,
         uint256 deadline
+    );
+
+    event CampaignFunded(
+        uint256 indexed campaignId,
+        address indexed contributor,
+        uint256 amount
     );
 
     enum CampaignStatus {
@@ -57,5 +66,21 @@ contract CrowdFunding {
             block.timestamp + duration
         );
         return campaignId;
+    }
+
+    function fundCampaign(uint256 campaignId) external payable {
+        Campaign storage campaign = campaigns[campaignId];
+
+        if (campaign.status != CampaignStatus.ACTIVE)
+            revert CampaignNotActive();
+
+        if (block.timestamp > campaign.deadline) revert CampaignEnded();
+
+        if (msg.value == 0) revert InvalidContribution();
+
+        campaign.amountRaised += msg.value;
+        contributions[campaignId][msg.sender] += msg.value;
+
+        emit CampaignFunded(campaignId, msg.sender, msg.value);
     }
 }
