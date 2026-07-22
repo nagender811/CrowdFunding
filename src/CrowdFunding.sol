@@ -119,19 +119,32 @@ contract CrowdFunding {
 
         uint256 amount = campaign.amountRaised;
 
-        (bool success,) = payable(campaign.creator).call{
-            value: amount
-        }("");
+        (bool success, ) = payable(campaign.creator).call{value: amount}("");
 
-        if(!success) revert TransferFailed();
+        if (!success) revert TransferFailed();
 
-        emit FundsWithdrawn(
-            campaignId,
-            campaign.creator,
-            amount
-        );
-
+        emit FundsWithdrawn(campaignId, campaign.creator, amount);
     }
 
-    
+    function claimRefund(uint256 campaignId) external {
+        Campaign storage campaign = campaigns[campaignId];
+
+        if (block.timestamp < campaign.deadline) revert CampaignNotEnded();
+
+        if (campaign.amountRaised >= campaign.goal) revert GoalReached();
+
+        campaign.status = CampaignStatus.FAILED;
+
+        uint256 amount = contributions[campaignId][msg.sender];
+
+        if (amount == 0) revert NoContribution();
+
+        contributions[campaignId][msg.sender] = 0;
+
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+
+        if (!success) revert TransferFailed();
+
+        emit RefundClaimed(campaignId, msg.sender, amount);
+    }
 }
