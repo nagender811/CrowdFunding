@@ -7,6 +7,13 @@ contract CrowdFunding {
     error CampaignNotActive();
     error CampaignEnded();
     error InvalidContribution();
+    error NotCreator();
+    error CampaignNotEnded();
+    error AlreadyWithdrawn();
+    error GoalNotReached();
+    error TransferFailed();
+    error GoalReached();
+    error NoContribution();
 
     event CampaignCreated(
         uint256 indexed campaignId,
@@ -16,6 +23,18 @@ contract CrowdFunding {
     );
 
     event CampaignFunded(
+        uint256 indexed campaignId,
+        address indexed contributor,
+        uint256 amount
+    );
+
+    event FundsWithdrawn(
+        uint256 indexed campaignId,
+        address indexed creator,
+        uint256 amount
+    );
+
+    event RefundClaimed(
         uint256 indexed campaignId,
         address indexed contributor,
         uint256 amount
@@ -83,4 +102,36 @@ contract CrowdFunding {
 
         emit CampaignFunded(campaignId, msg.sender, msg.value);
     }
+
+    function withdrawFunds(uint256 campaignId) external {
+        Campaign storage campaign = campaigns[campaignId];
+
+        if (msg.sender == campaign.creator) revert NotCreator();
+
+        if (block.timestamp < campaign.deadline) revert CampaignNotEnded();
+
+        if (campaign.withdrawn) revert AlreadyWithdrawn();
+
+        if (campaign.goal > campaign.amountRaised) revert GoalNotReached();
+
+        campaign.withdrawn = true;
+        campaign.status = CampaignStatus.SUCCESSFUL;
+
+        uint256 amount = campaign.amountRaised;
+
+        (bool success,) = payable(campaign.creator).call{
+            value: amount
+        }("");
+
+        if(!success) revert TransferFailed();
+
+        emit FundsWithdrawn(
+            campaignId,
+            campaign.creator,
+            amount
+        );
+
+    }
+
+    
 }
